@@ -5,32 +5,65 @@
 /* TODO
  * Send errors to SDL log instead of (or maybe alongside) stdout
  * Change return values to SDL defined enums to follow style
- * Fix the issue with onClick() - see function declaration
  * Add function pointer to onClick parameters, maybe. So that you can tell it to do a specified function on click?
+ * Maybe put some of these global-ish variables into a header file?
+ * "Migrate" functions from SDL_FRect parameters to Buttons
+ * Event processing in a switch block
  */
 
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 char windowTitle[] = "My SDL Project";
 
-static SDL_Window *window;
-static SDL_Renderer *renderer;
-static SDL_Event event;
-static float mouseX;
-static float mouseY;
+SDL_Window *window;
+SDL_Renderer *renderer;
+SDL_Event event;
 
-void renderButton(SDL_FRect *b) {
-    SDL_SetRenderDrawColor(renderer, 235, 235, 235, SDL_ALPHA_OPAQUE);
-    SDL_RenderFillRect(renderer, b);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
-    SDL_RenderRect(renderer, b);
+struct {
+    float mouseDownX;
+    float mouseDownY;
+    float mouseUpX;
+    float mouseUpY;
+
+    float currentX;
+    float currentY;
+
+    int mouseDownButton;
+} mouseState;
+
+
+typedef struct {
+    SDL_FRect box; // Bounding box
+    void (*func)(); // Generic function so that different buttons can do different things when pressed
+} Button;
+
+// Takes in a SDL_FRect (maybe change to Button struct in future) and two coordinates and checks if its in bounds of the rect
+bool inBounds(SDL_FRect *b, float x, float y) {
+    return (b->x < x) && (x < b->x + b->w) && (b->y < y) && (y < b->y + b->h);
 }
-void onClick(SDL_FRect *b) { // This triggers really fast, leading to tens to hundreds of calls even in a reasonable click duration. Figure out how to fix
-    if (SDL_GetMouseState(&mouseX, &mouseY) == 1 && 
-        (b->x < mouseX ) && (mouseX < b->x + b->w) &&
-        (b->y < mouseY ) && (mouseY < b->y + b->h)) {
-        printf("Button Clicked");
+
+// Takes in a SDL_FRect (maybe change to Button struct in future) and handles rendering
+void renderButton(Button *b) {
+    if (mouseState.mouseDownButton == 1 && inBounds(&b->box, mouseState.currentX, mouseState.currentY)) SDL_SetRenderDrawColor(renderer, 200, 200, 200, SDL_ALPHA_OPAQUE);
+    else SDL_SetRenderDrawColor(renderer, 235, 235, 235, SDL_ALPHA_OPAQUE);
+    SDL_RenderFillRect(renderer, &b->box);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
+    SDL_RenderRect(renderer, &b->box);
+}
+
+// Somewhat of a debug function that triggers the print statement if the button is properly clicked
+void onClick(Button *b) { 
+    if (mouseState.mouseDownButton == 1 && inBounds(&b->box, mouseState.currentX, mouseState.currentY) && inBounds(&b->box, mouseState.mouseDownX, mouseState.mouseDownY)) {
+        b -> func();
     }
+}
+
+// Two testing functions
+void testFunction() {
+    printf("Button Clicked\n");
+}
+void testFunction1() { 
+    printf("Other Button Clicked\n");
 }
 
 
@@ -54,21 +87,42 @@ int main(int argc, char **argv) {
         printf("Window created...\n");
     }
 
-    SDL_FRect testButton = { 10, 10, 150, 50 };
+    Button buttons[] = { //array of all the buttons in the program, and an enum so they can be accessed by name. hacky? maybe, i dont know
+        {{ 10, 10, 150, 50 }, testFunction },
+        {{ 10, 70, 150, 50 }, testFunction1 }
+    }; 
+    enum buttonNames {
+        test,
+        otherTest
+    };
 
     // Program loop
 
     while(1) {
         SDL_PollEvent(&event);
+
+        //Maybe replace this if/else thing with a switch block? For SDL_EVENT_QUIT, should I use a goto (*gulp*)?
         if (event.type == SDL_EVENT_QUIT) {
             break;
+        } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+            SDL_GetMouseState(&mouseState.mouseDownX, &mouseState.mouseDownY);
+            mouseState.mouseDownButton = event.button.button;
+        } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            SDL_GetMouseState(&mouseState.mouseUpX, &mouseState.mouseUpY);
+            for (int i = 0; i < sizeof(buttons)/sizeof(buttons[0]); i++) {
+                onClick(&buttons[i]); //debug kinda
+            }
+            mouseState.mouseDownButton = 0;
+        } else if (event.type = SDL_EVENT_MOUSE_MOTION) {
+            SDL_GetMouseState(&mouseState.currentX, &mouseState.currentY);
         }
-        onClick(&testButton);
 
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(renderer);
 
-        renderButton(&testButton);
+        for (int i = 0; i < sizeof(buttons)/sizeof(buttons[0]); i++) {
+            renderButton(&buttons[i]);
+        }
         SDL_RenderPresent(renderer);
     }
 
