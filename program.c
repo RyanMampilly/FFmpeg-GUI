@@ -5,10 +5,9 @@
 /* TODO
  * Send errors to SDL log instead of (or maybe alongside) stdout
  * Change return values to SDL defined enums to follow style
- * Add function pointer to onClick parameters, maybe. So that you can tell it to do a specified function on click?
  * Maybe put some of these global-ish variables into a header file?
- * "Migrate" functions from SDL_FRect parameters to Buttons
  * Event processing in a switch block
+ * Use SDL_ttf for text rendering in the future?
  */
 
 const int WINDOW_WIDTH = 800;
@@ -34,6 +33,7 @@ struct {
 
 typedef struct {
     SDL_FRect box; // Bounding box
+    char string[32]; // Text displayed on button (32 bytes long max)
     void (*func)(); // Generic function so that different buttons can do different things when pressed
 } Button;
 
@@ -44,11 +44,14 @@ bool inBounds(SDL_FRect *b, float x, float y) {
 
 // Takes in a SDL_FRect (maybe change to Button struct in future) and handles rendering
 void renderButton(Button *b) {
-    if (mouseState.mouseDownButton == 1 && inBounds(&b->box, mouseState.currentX, mouseState.currentY)) SDL_SetRenderDrawColor(renderer, 200, 200, 200, SDL_ALPHA_OPAQUE);
+    if (mouseState.mouseDownButton == 1 && inBounds(&b->box, mouseState.mouseDownX, mouseState.mouseDownY)) SDL_SetRenderDrawColor(renderer, 200, 200, 200, SDL_ALPHA_OPAQUE);
     else SDL_SetRenderDrawColor(renderer, 235, 235, 235, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(renderer, &b->box);
     SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);
     SDL_RenderRect(renderer, &b->box);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderDebugText(renderer, (b->box.x + b->box.w / 2 - strlen(b->string) * 4), (b->box.y + b->box.h / 2 - 4), b->string);
+
 }
 
 // Somewhat of a debug function that triggers the print statement if the button is properly clicked
@@ -88,8 +91,8 @@ int main(int argc, char **argv) {
     }
 
     Button buttons[] = { //array of all the buttons in the program, and an enum so they can be accessed by name. hacky? maybe, i dont know
-        {{ 10, 10, 150, 50 }, testFunction },
-        {{ 10, 70, 150, 50 }, testFunction1 }
+        {{ 10, 10, 150, 50 }, "Button number 1", testFunction },
+        {{ 10, 70, 150, 50 }, "Button number 2", testFunction1 }
     }; 
     enum buttonNames {
         test,
