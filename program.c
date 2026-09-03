@@ -8,6 +8,7 @@
  * Maybe put some of these global-ish variables into a header file?
  * Event processing in a switch block
  * Use SDL_ttf for text rendering in the future?
+ * Figure out how to make the text box text buffers work
  */
 
 const int WINDOW_WIDTH = 800;
@@ -31,18 +32,28 @@ struct {
 } mouseState;
 
 
-typedef struct {
-    SDL_FRect box; // Bounding box
-    char string[32]; // Text displayed on button (32 bytes long max)
-    void (*func)(); // Generic function so that different buttons can do different things when pressed
+
+typedef struct { // 56 bytes
+    SDL_FRect box; // Bounding box // 16 bytes
+    char string[32]; // Text displayed on button // 32 bytes 
+    void (*func)(); // Generic function so that different buttons can do different things when pressed // 8 bytes
+    // char padding[8]; // In case I want to pad these objects to 64 bytes
 } Button;
 
-// Takes in a SDL_FRect (maybe change to Button struct in future) and two coordinates and checks if its in bounds of the rect
+typedef struct { // 144 bytes
+    SDL_FRect box; // Bounding box // 16 bytes
+    char string[128]; // Text that can fit in the text box // 128 bytes
+                      // For now, this will be the maximum amount of text a textbox CAN hold
+} TextBox;
+
+
+
+// Takes in a SDL_FRect and two coordinates and checks if its in bounds of the rect
 bool inBounds(SDL_FRect *b, float x, float y) {
     return (b->x < x) && (x < b->x + b->w) && (b->y < y) && (y < b->y + b->h);
 }
 
-// Takes in a SDL_FRect (maybe change to Button struct in future) and handles rendering
+// Takes in a Button and handles rendering
 void renderButton(Button *b) {
     if (mouseState.mouseDownButton == 1 && inBounds(&b->box, mouseState.mouseDownX, mouseState.mouseDownY)) SDL_SetRenderDrawColor(renderer, 200, 200, 200, SDL_ALPHA_OPAQUE);
     else SDL_SetRenderDrawColor(renderer, 235, 235, 235, SDL_ALPHA_OPAQUE);
@@ -51,10 +62,9 @@ void renderButton(Button *b) {
     SDL_RenderRect(renderer, &b->box);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderDebugText(renderer, (b->box.x + b->box.w / 2 - strlen(b->string) * 4), (b->box.y + b->box.h / 2 - 4), b->string);
-
 }
 
-// Somewhat of a debug function that triggers the print statement if the button is properly clicked
+// Runs the object's function on click
 void onClick(Button *b) { 
     if (mouseState.mouseDownButton == 1 && inBounds(&b->box, mouseState.currentX, mouseState.currentY) && inBounds(&b->box, mouseState.mouseDownX, mouseState.mouseDownY)) {
         b -> func();
@@ -68,6 +78,7 @@ void testFunction() {
 void testFunction1() { 
     printf("Other Button Clicked\n");
 }
+
 
 
 int main(int argc, char **argv) {
@@ -104,6 +115,11 @@ int main(int argc, char **argv) {
     while(1) {
         SDL_PollEvent(&event);
 
+        // Prevent unnecessary rendering (may need to remove later) When there are no events, just repoll
+        if (event.type == SDL_EVENT_POLL_SENTINEL) continue; 
+
+        printf("0x%x\n", event.type); //DEBUG
+        
         //Maybe replace this if/else thing with a switch block? For SDL_EVENT_QUIT, should I use a goto (*gulp*)?
         if (event.type == SDL_EVENT_QUIT) {
             break;
