@@ -59,6 +59,9 @@ dkms.conf
 # Change to name of the compiled program if name changes
 program
 
+# Output file to pipe to, to look at compiler warnings and errors
+.output
+
 # Vim swap files
 *.sw[a-p]
 *.s[a-v][a-z]
